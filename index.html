@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>航班即時查詢</title>
+  <style>
+    body {
+      font-family: "微軟正黑體", sans-serif;
+      background: #f2f2f2;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    label {
+      margin-right: 8px;
+    }
+    input, button {
+      padding: 8px 12px;
+      margin-right: 8px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      background: #007BFF;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    .flight-card {
+      background: #fff;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 16px;
+    }
+    .flight-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .flight-header h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .flight-details {
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>熱門即時航班查詢</h1>
+
+  <label>出發城市（可輸入中文）:</label>
+  <input type="text" id="depCity" placeholder="例如 台北 或 TPE">
+  <label>抵達城市（可選，中文或IATA）:</label>
+  <input type="text" id="arrCity" placeholder="例如 洛杉磯 或 LAX">
+  <label>日期:</label>
+  <input type="date" id="date">
+  <button onclick="loadFlights()">查詢航班</button>
+
+  <div id="flight-list"></div>
+
+  <script>
+    // 中文城市對 IATA 代碼對照表
+    const cityToIata = {
+      "台北": "TPE",
+      "松山": "TSA",
+      "高雄": "KHH",
+      "台中": "RMQ",
+      "洛杉磯": "LAX",
+      "紐約": "JFK",
+      "舊金山": "SFO",
+      "西雅圖": "SEA",
+      "休士頓": "IAH",
+      "東京羽田": "HND",
+      "羽田": "HND",
+      "東京成田": "NRT",
+      "成田": "NRT",
+      "拉斯維加斯": "LAS"
+    };
+
+    // 中文或 IATA 自動轉換函式
+    function toIata(cityOrCode) {
+      const input = cityOrCode.trim();
+      return cityToIata[input] || input.toUpperCase();
+    }
+	
+	
+	
+    function loadFlights() {
+      const apiKey = "90649199c0ad90fc83310cce4c5b35fc";
+
+      const depCityInput = document.getElementById("depCity").value;
+      const arrCityInput = document.getElementById("arrCity").value;
+      const date = document.getElementById("date").value;
+
+      const depCity = toIata(depCityInput);
+      const arrCity = toIata(arrCityInput);
+
+      if (!depCity || !date) {
+        alert("請輸入出發地與日期");
+        return;
+      }
+
+	  const apiUrl = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&limit=100&dep_iata=${depCity}`;
+
+      fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+          const flightList = document.getElementById("flight-list");
+          flightList.innerHTML = "";
+
+          const flights = data.data.filter(flight => {
+            const depTime = flight.departure?.scheduled;
+            const arrIata = flight.arrival?.iata;
+            if (!depTime) return false;
+
+            const flightDate = depTime.split("T")[0];
+            const matchDate = flightDate === date;
+            const matchArr = !arrCity || arrIata === arrCity;
+
+            return matchDate && matchArr;
+          });
+
+          if (flights.length === 0) {
+            flightList.innerHTML = "<p>查無航班資料，請確認城市名稱與日期</p>";
+            return;
+          }
+
+        flights.forEach(flight => {
+  const card = document.createElement("div");
+  card.className = "flight-card";
+
+  card.innerHTML = `
+    <div class="flight-header">
+      <h3>${flight.airline.name} - ${flight.flight.iata}</h3>
+      <span>狀態：${flight.flight_status}</span>
+    </div>
+    <div class="flight-details">
+      <strong>出發：</strong> ${flight.departure.airport} (${flight.departure.iata})<br>
+      <strong>預計出發：</strong> ${flight.departure.scheduled || 'N/A'}<br>
+      <strong>抵達：</strong> ${flight.arrival.airport} (${flight.arrival.iata})<br>
+      <strong>預計抵達：</strong> ${flight.arrival.scheduled || 'N/A'}
+    </div>
+    <button onclick="openBooking('${flight.airline.name}', '${flight.flight.iata}')">訂票</button>
+  `;
+
+  flightList.appendChild(card);
+});
+
+        })
+        .catch(error => {
+          console.error("載入失敗：", error);
+          alert("無法取得航班資料，請檢查 API Key 或網路狀況");
+        });
+    }
+	
+	function openBooking(airline, flightNumber) {
+  const bookingWindow = window.open("", "_blank");
+  bookingWindow.document.write(`
+    <html>
+    <head>
+      <title>訂票 | ${airline} - ${flightNumber}</title>
+      <style>
+        body { font-family: sans-serif; padding: 20px; }
+        h2 { margin-bottom: 16px; }
+        label, select, input { margin: 8px 0; padding: 6px; font-size: 16px; }
+        button { padding: 8px 16px; background: #007BFF; color: #fff; border: none; border-radius: 6px; margin-top: 10px; cursor: pointer; }
+        #priceResult, #successMsg { margin-top: 20px; font-size: 18px; }
+      </style>
+    </head>
+    <body>
+      <h2>${airline} - 航班 ${flightNumber}</h2>
+      <label>艙等：</label>
+      <select id="class">
+        <option value="economy">經濟艙</option>
+        <option value="business">商務艙</option>
+      </select><br>
+      <label>人數：</label>
+      <input type="number" id="passengers" value="1" min="1" max="10"><br>
+      <button id="calcBtn">計算價格</button>
+      <div id="priceResult"></div>
+      <button id="confirmBtn" style="display:none;">確認訂購</button>
+      <div id="successMsg"></div>
+    </body>
+    </html>
+  `);
+
+  bookingWindow.document.close();
+
+  // 計算票價 function
+  bookingWindow.calculatePrice = function() {
+    const classType = bookingWindow.document.getElementById("class").value;
+    const passengers = parseInt(bookingWindow.document.getElementById("passengers").value);
+    let basePrice = classType === "economy" ? 8000 : 20000;
+    const total = basePrice * passengers;
+    bookingWindow.document.getElementById("priceResult").innerHTML =
+      '預估票價：NT$ ' + total.toLocaleString() + ' 元';
+
+    // 顯示確認訂購按鈕
+    bookingWindow.document.getElementById("confirmBtn").style.display = "inline-block";
+  };
+
+  // 確認訂購 function
+  bookingWindow.confirmBooking = function() {
+    bookingWindow.document.getElementById("successMsg").innerHTML = "✅ 預定成功！感謝您的訂購！";
+  };
+
+  // 綁定按鈕事件
+  bookingWindow.document.getElementById("calcBtn").onclick = bookingWindow.calculatePrice;
+  bookingWindow.document.getElementById("confirmBtn").onclick = bookingWindow.confirmBooking;
+}
+
+	
+  </script>
+
+</body>
+</html>
