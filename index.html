@@ -105,7 +105,9 @@
         return;
       }
 
-	  const apiUrl = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&limit=100&dep_iata=${depCity}`;
+	  const realApi = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&limit=100&dep_iata=${depCity}`;
+	  const apiUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(realApi)}`;
+
 
       fetch(apiUrl)
         .then(response => response.json())
